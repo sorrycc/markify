@@ -1,0 +1,15 @@
+{
+  "name": "@sorrycc/markify",
+  "version": "0.0.1-alpha.1",
+  "scripts": {
+    "build": "tsc --outDir dist",
+    "dev": "tsc --outDir dist --watch",
+    "postbuild": "node scripts/postbuild.js"
+  },
+  "devDependencies": {
+    "@mozilla/readability": "^0.5.0",
+    "@types/node": "^20.12.7",
+    "@types/turndown": "^5.0.4",
+    "typescript": "^5.4.5"
+  }
+}
