@@ -4,12 +4,17 @@
   "scripts": {
     "build": "tsc --outDir dist",
     "dev": "tsc --outDir dist --watch",
-    "postbuild": "node scripts/postbuild.js"
+    "postbuild": "node scripts/postbuild.js",
+    "test": "esno src/markify.test.ts"
   },
   "devDependencies": {
     "@mozilla/readability": "^0.5.0",
     "@types/node": "^20.12.7",
     "@types/turndown": "^5.0.4",
+    "esno": "^4.7.0",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "turndown": "^7.1.3"
   }
 }
