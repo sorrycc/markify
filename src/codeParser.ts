@@ -5,7 +5,7 @@ interface ParseCodeResult {
 }
 
 function codeText(el: HTMLElement) {
-  return el.textContent;
+  return el.textContent || '';
   // // TODO: why innerText don't work in node?
   // let isBrowser = typeof window !== 'undefined';
   // return isBrowser ? el.innerText : el.innerHTML;
