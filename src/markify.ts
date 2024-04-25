@@ -1,12 +1,9 @@
-// TODO: use bundle to include turndown.js for browser
-// 'file: libs/turndown.js';
-
 import TurndownService from 'turndown';
+import path from 'path';
 import { parseCode } from './codeParser';
 
 interface MarkifyOpts {
-  html: string;
-  // for relative URLs
+  html: string | HTMLElement | Document | DocumentFragment;
   url: string;
 }
 
@@ -25,6 +22,7 @@ export class Markify {
     });
 
     let opts = this.#opts;
+    let url = new URL(opts.url);
     turndownService.addRule('code', {
       filter(node) {
         let parseResult = parseCode(node as HTMLElement, opts.url);
@@ -54,18 +52,31 @@ export class Markify {
         const el = node as HTMLImageElement;
         const alt = cleanAttribute(el.getAttribute('alt'));
         let src = el.getAttribute('src') || '';
-        // TODO: support relative URLs
-        if (src.startsWith('/')) {
-          // TODO: join with this.#opts.url
-          src = window.location.origin + src;
-        } else if (isRemote(src)) {
-          src = src;
+        if (!isRemote(src)) {
+          src = url.origin + path.resolve(url.pathname, src);
         }
         return src ? '![' + alt + ']' + '(' + src + ')' : ''
       }
     });
 
-    return turndownService.turndown(this.#opts.html);
+    let markdown = turndownService.turndown(this.#opts.html);
+    markdown = this.#normalizeMarkdown(markdown);
+    return markdown;
+  }
+
+  #normalizeMarkdown(markdown: string) {
+    let lines = markdown.split('\n');
+    let result = [];
+    for (let line of lines) {
+      // remove anchor link for empty header
+      // e.g. [#](#why-did-this-happen)
+      if (/^\[#\]\(#[^\)]+\)$/.test(line.trim())) {
+        continue;
+      } else {
+        result.push(line);
+      }
+    }
+    return result.join('\n');
   }
 }
 

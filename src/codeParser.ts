@@ -4,12 +4,20 @@ interface ParseCodeResult {
   code: string;
 }
 
+function codeText(el: HTMLElement) {
+  return el.textContent;
+  // // TODO: why innerText don't work in node?
+  // let isBrowser = typeof window !== 'undefined';
+  // return isBrowser ? el.innerText : el.innerHTML;
+}
+
 export function parseCode(node: HTMLElement, url: string): ParseCodeResult | null {
   if (node.nodeName !== 'PRE') {
     return null;
   }
   let preClass = node.className || '';
   let codeEl = findCodeEl(node);
+  let parentEl = node.parentElement;
   let code = '';
   let language = '';
   if (codeEl) {
@@ -18,9 +26,7 @@ export function parseCode(node: HTMLElement, url: string): ParseCodeResult | nul
     if (lang) {
       language = lang;
     }
-    // TODO: why innerText don't work in node?
-    code = codeEl.innerHTML;
-    // code = codeEl.innerText;
+    code = codeText(codeEl);
   }
 
   // language for shiki
@@ -32,6 +38,22 @@ export function parseCode(node: HTMLElement, url: string): ParseCodeResult | nul
       language = langEl.textContent || '';
     }
   }
+
+  // github code block
+  if (!code && !language) {
+    let cls = parentEl?.getAttribute('class') || '';
+    let clsItems = cls.split(' ');
+    const isHighlight = clsItems.includes('highlight');
+    if (isHighlight && !codeEl) {
+      let cls = clsItems.filter(item => item.startsWith('highlight-source-'))[0];
+      if (cls) {
+        language = cls.replace('highlight-source-', '');
+      }
+      code = codeText(node);
+    }
+  }
+
+  code = code.trim();
 
   return {
     code,
