@@ -1,0 +1,11 @@
+{
+  "entry": {
+    "browser": "src/browser.ts"
+  },
+  "resolve": {
+    "alias": {
+      "turndown": "./libs/turndown.js"
+    }
+  }
+}
+

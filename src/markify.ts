@@ -1,125 +1,49 @@
-import type TurndownService from 'turndown';
+import TurndownService from 'turndown';
+import path from 'path';
+import { parseCode } from './codeParser';
+import { unescape } from 'querystring';
 
-'file: libs/turndown.js';
-'file: libs/Readability.js';
-
-declare global {
-  interface Window {
-    TurndownService: typeof import('turndown');
-  }
-  const TurndownService: typeof import('turndown');
-  const Readability: typeof import('@mozilla/readability').Readability;
+interface MarkifyOpts {
+  html: string | HTMLElement | Document | DocumentFragment;
+  url: string;
 }
 
-class HtmlToMarkdown {
-  #html: HTMLElement;
-  constructor() {
-    this.#html = this.#getMainContentElement();
-    this.#convert().then(() => {
-      console.log('done');
-    }).catch((err) => {
-      console.error(err);
-    });
+export class Markify {
+  #opts: MarkifyOpts;
+  constructor(opts: MarkifyOpts) {
+    this.#opts = opts;
   }
 
-  #getMainContentElement() {
-    const mainContent = document.querySelector('main');
-    if (mainContent) return mainContent;
-    const article = document.querySelector('article');
-    if (article) return article;
-    return document.body;
-  }
-
-  async #getTurndownClass() {
-    return new Promise<typeof TurndownService>((resolve, reject) => {
-      const inBrowser = typeof window !== 'undefined';
-      if (inBrowser) {
-        if (window.TurndownService) return resolve(window.TurndownService);
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/turndown/dist/turndown.js';
-        document.body.appendChild(script);
-        script.onload = () => {
-          resolve(window.TurndownService);
-        };
-        script.onerror = (err) => {
-          reject(err);
-        };
-      } else {
-        resolve(require('turndown'));
-      }
-    });
-  }
-
-  async #convert() {
-    // const TurndownService = await this.#getTurndownClass();
-    // @ts-ignore
+  async toMarkdown() {
     const turndownService = new TurndownService({
       headingStyle: 'atx',
       codeBlockStyle: undefined,
       // @ts-ignore
       preformattedCode: false,
     });
+
+    let opts = this.#opts;
+    let url = new URL(opts.url);
     turndownService.addRule('code', {
-      filter(node, options) {
-        // https://github.com/denoland/fresh/issues/2363
-        if (node.nodeName === 'PRE' && (node.parentNode! as HTMLElement).className.includes('highlight')) {
+      filter(node) {
+        let parseResult = parseCode(node as HTMLElement, opts.url);
+        if (parseResult) {
+          const { code, language } = parseResult;
+          node.setAttribute('data-markify-code', code);
+          node.setAttribute('data-markify-language', language);
           return true;
+        } else {
+          return false;
         }
-        // https://www.joshwcomeau.com/react/css-in-rsc/
-        if (node.nodeName === 'PRE' && node.querySelector('div[data-code-snippet=true]')) {
-          return true;
-        }
-        return !!(
-          node.nodeName === 'PRE' &&
-          node.firstChild &&
-          (node.firstChild.nodeName === 'CODE' ||
-            // why pre > pre?
-            // e.g. https://www.robinwieruch.de/next-forms/
-            node.firstChild.nodeName === 'PRE' ||
-            // why
-            // e.g. https://claritydev.net/blog/improving-react-testing-library-tests
-            node.lastChild?.nodeName === 'CODE' ||
-            // e.g. https://www.totaltypescript.com/typescript-and-node
-            node.querySelector('div.code-container')
-          )
-        )
       },
       replacement(content, node, options) {
-        let codeEl = (node.lastChild?.nodeName === 'CODE' ? node.lastChild : node.firstChild) as HTMLElement;
-        let language = '';
-        if (codeEl && codeEl.nodeName === 'CODE') {
-          const className = codeEl.getAttribute('class') || '';
-          language = (className.match(/language-(\S+)/) || [null, ''])[1];
-          if (!language && (node as HTMLElement).getAttribute('data-language')) {
-            language = (node as HTMLElement).getAttribute('data-language')!;
-          }
-          // ref: https://www.totaltypescript.com/typescript-and-node
-          if (node.querySelector('div.language-id')) {
-            language = node.querySelector('div.language-id')!.textContent!;
-          }
-          // ref: https://www.totaltypescript.com/typescript-and-node
-          if (node.querySelector('div.code-container > code')) {
-            codeEl = node.querySelector('div.code-container > code') as HTMLElement;
-          }
-        }
-        // ref: https://github.com/denoland/fresh/issues/2363
-        if (node.nodeName === 'PRE' && (node.parentNode! as HTMLElement).className.includes('highlight')) {
-          codeEl = node as HTMLElement;
-        }
-        // https://www.joshwcomeau.com/react/css-in-rsc/
-        if (node.nodeName === 'PRE' && node.querySelector('div[data-code-snippet=true]')) {
-          codeEl = node.querySelector('div[data-code-snippet=true] textarea') as HTMLElement;
-          language = node.firstChild!.firstChild!.textContent!;
-        }
-        const code = codeEl.innerText;
-        // console.log('----');
-        // console.log(node);
-        // console.log((node as HTMLElement).innerText);
-        // console.log('----');
+        const language = (node as HTMLElement).getAttribute('data-markify-language') || '';
+        const code = (node as HTMLElement).getAttribute('data-markify-code') || '';
         const fence = options.fence;
         return `\n\n${fence}${language}\n${code}\n${fence}\n\n`;
-      }
+      },
     });
+
     turndownService.addRule('image', {
       filter: 'img',
       replacement: (content, node) => {
@@ -129,21 +53,49 @@ class HtmlToMarkdown {
         const el = node as HTMLImageElement;
         const alt = cleanAttribute(el.getAttribute('alt'));
         let src = el.getAttribute('src') || '';
-        // TODO: support relative URLs
-        if (src.startsWith('/')) {
-          src = window.location.origin + src;
-        } else if (src.startsWith('http')) {
-          src = src;
+        if (!isRemote(src)) {
+          src = url.origin + path.resolve(url.pathname, src);
         }
-        const title = cleanAttribute(el.getAttribute('title'));
-        const titlePart = title ? ' "' + title + '"' : '';
-        return src ? '![' + alt + ']' + '(' + src + titlePart + ')' : ''
+        return src ? '![' + alt + ']' + '(' + src + ')' : ''
       }
     });
-    const markdown = turndownService.turndown(this.#html);
-    console.log(markdown);
+
+    let markdown = turndownService.turndown(this.#opts.html);
+    markdown = this.#normalizeMarkdown(markdown);
+    return markdown;
+  }
+
+  #normalizeMarkdown(markdown: string) {
+    let lines = markdown.split('\n');
+    let result = [];
+    for (let line of lines) {
+      let originLine = line;
+
+      line = line.trim();
+      line = line.replace(/\\#/g, '#');
+      line = line.replace(/\\\[/g, '[');
+      line = line.replace(/\\\]/g, ']');
+
+      // remove anchor link for empty header
+      // e.g. [#](#why-did-this-happen)
+      if (/^\[#\]\(#[^\)]+\)$/.test(line)) {
+        continue;
+      }
+      // remove end anchor link for headers
+      // e.g. # test[](#why-did-this-happen)
+      let endWithAnchorReg = /\[\]\(#[^\)]+\)$/;
+      let isTitle = /^#+\s+[^\s]/.test(line);
+      if (isTitle && endWithAnchorReg.test(line)) {
+        result.push(line.replace(endWithAnchorReg, ''));
+        continue;
+      }
+
+      result.push(originLine);
+    }
+    return result.join('\n');
   }
 }
 
-new HtmlToMarkdown();
-
+function isRemote(url: string) {
+  return url.startsWith('http://') || url.startsWith('https://');
+}
