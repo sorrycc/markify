@@ -12,6 +12,7 @@ import { Markify } from "./markify";
 
   // code
   assert.strictEqual(await testMarkify('<pre><code class="language-ts">a;</code><pre>'), '```ts\na;\n```');
+  assert.strictEqual(await testMarkify('<pre class="sp-cm sp-pristine sp-typescript"><code>a;</code><pre>'), '```typescript\na;\n```');
   // shiki
   assert.strictEqual(await testMarkify('<pre class="shiki foo"><div class="language-id">ts</div><code>a;</code><pre>'), '```ts\na;\n```');
   // github
@@ -19,6 +20,9 @@ import { Markify } from "./markify";
 
   // remove anchor links only lines
   assert.strictEqual(await testMarkify('<a href="#abc">#</a>'), '');
+  // remove end anchor link for headers
+  assert.strictEqual(await testMarkify('# test[](#abc)'), '# test');
+  assert.strictEqual(await testMarkify('# test[](#abc "d")'), '# test');
 })();
 
 async function testMarkify(html: string, url: string = 'http://localhost') {

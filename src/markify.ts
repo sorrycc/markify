@@ -1,6 +1,7 @@
 import TurndownService from 'turndown';
 import path from 'path';
 import { parseCode } from './codeParser';
+import { unescape } from 'querystring';
 
 interface MarkifyOpts {
   html: string | HTMLElement | Document | DocumentFragment;
@@ -68,13 +69,28 @@ export class Markify {
     let lines = markdown.split('\n');
     let result = [];
     for (let line of lines) {
+      let originLine = line;
+
+      line = line.trim();
+      line = line.replace(/\\#/g, '#');
+      line = line.replace(/\\\[/g, '[');
+      line = line.replace(/\\\]/g, ']');
+
       // remove anchor link for empty header
       // e.g. [#](#why-did-this-happen)
-      if (/^\[#\]\(#[^\)]+\)$/.test(line.trim())) {
+      if (/^\[#\]\(#[^\)]+\)$/.test(line)) {
         continue;
-      } else {
-        result.push(line);
       }
+      // remove end anchor link for headers
+      // e.g. # test[](#why-did-this-happen)
+      let endWithAnchorReg = /\[\]\(#[^\)]+\)$/;
+      let isTitle = /^#+\s+[^\s]/.test(line);
+      if (isTitle && endWithAnchorReg.test(line)) {
+        result.push(line.replace(endWithAnchorReg, ''));
+        continue;
+      }
+
+      result.push(originLine);
     }
     return result.join('\n');
   }

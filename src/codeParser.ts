@@ -5,21 +5,36 @@ interface ParseCodeResult {
 }
 
 function codeText(el: HTMLElement) {
-  return el.textContent || '';
-  // // TODO: why innerText don't work in node?
-  // let isBrowser = typeof window !== 'undefined';
-  // return isBrowser ? el.innerText : el.innerHTML;
+  // return el.textContent || '';
+  // TODO: why innerText don't work in node?
+  let isBrowser = typeof window !== 'undefined';
+  return isBrowser ? el.innerText : el.innerHTML;
 }
+
+function trimDoubleLineBreak(text: string) {
+  return text.replace(/\n\n/g, '\n');
+}
+
+const LANGUAGES = [
+  'javascript',
+  'typescript',
+  'html',
+  'css',
+];
 
 export function parseCode(node: HTMLElement, url: string): ParseCodeResult | null {
   if (node.nodeName !== 'PRE') {
     return null;
   }
+
   let preClass = node.className || '';
   let codeEl = findCodeEl(node);
   let parentEl = node.parentElement;
   let code = '';
   let language = '';
+  let cls = node.getAttribute('class') || '';
+  let clsItems = cls.split(' ');
+
   if (codeEl) {
     let className = codeEl.getAttribute('class') || '';
     let lang = (className.match(/language-(\S+)/) || [null, ''])[1];
@@ -51,6 +66,18 @@ export function parseCode(node: HTMLElement, url: string): ParseCodeResult | nul
       }
       code = codeText(node);
     }
+  }
+
+  // e.g. sp-cm sp-pristine sp-javascript
+  // e.g. https://react.dev/blog/2024/04/25/react-19
+  if (!language && clsItems.includes('sp-cm')) {
+    for (let lang of LANGUAGES) {
+      if (clsItems.includes(`sp-${lang}`)) {
+        language = lang;
+        break;
+      }
+    }
+    code = trimDoubleLineBreak(code);
   }
 
   code = code.trim();
