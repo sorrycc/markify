@@ -24,7 +24,7 @@ function transformScript(script) {
         return line;
     }).join('\n');
     // add anonymous function wrapper
-    content = `(() => {${content}})();`;
+    content = `(() => {\n${content}\n})();`;
 
     fs.writeFileSync(scriptPath, content, 'utf8');
     console.log(`Transformed ${script}`);
