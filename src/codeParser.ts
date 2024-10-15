@@ -23,6 +23,16 @@ const LANGUAGES = [
 ];
 
 export function parseCode(node: HTMLElement, url: string): ParseCodeResult | null {
+  let isEpicReact = node.nodeName === 'DIV' && node.className.includes('ch-codeblock');
+  if (isEpicReact) {
+    let language = node.querySelector('.ch-code-scroll-parent')?.getAttribute('data-ch-lang') || '';
+    let code = codeText(findCodeEl(node));
+    return {
+      code,
+      language,
+    };
+  }
+
   if (node.nodeName !== 'PRE') {
     return null;
   }
@@ -78,6 +88,15 @@ export function parseCode(node: HTMLElement, url: string): ParseCodeResult | nul
       }
     }
     code = trimDoubleLineBreak(code);
+  }
+
+  if (!code && !codeEl) {
+    code = codeText(node);
+  }
+
+  // default language
+  if (!language) {
+    language = 'ts';
   }
 
   code = code.trim();

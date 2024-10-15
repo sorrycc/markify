@@ -54,7 +54,11 @@ export class Markify {
         const alt = cleanAttribute(el.getAttribute('alt'));
         let src = el.getAttribute('src') || '';
         if (!isRemote(src)) {
-          src = url.origin + path.resolve(url.pathname, src);
+          let pathname = url.pathname;
+          if (!pathname.endsWith('/')) {
+            pathname = path.dirname(pathname);
+          }
+          src = url.origin + path.resolve(pathname, src);
         }
         return src ? '![' + alt + ']' + '(' + src + ')' : ''
       }
